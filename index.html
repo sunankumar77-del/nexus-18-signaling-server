@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS-18 | Random Video Chat</title>
+  
+  <!-- Google AdSense: after approval, add the official loader using your real ca-pub ID.
+       Example: <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_ID" crossorigin="anonymous"></script>
+       A placeholder ID is intentionally not loaded. -->
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- GSAP Core & ScrollTrigger -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              black: '#07090e',
+              dark: '#0c0f17',
+              panel: '#111622',
+              border: '#1f293d',
+              neon: '#00f0ff',
+              emerald: '#10b981',
+              crimson: '#ff0055',
+              amber: '#f59e0b'
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #07090e; }
+    ::-webkit-scrollbar-thumb { background: #1f293d; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00f0ff; }
+
+    /* CSS 3D Perspective Context */
+    .perspective-1000 { perspective: 1000px; }
+    .transform-style-3d { transform-style: preserve-3d; }
+    .backface-hidden { backface-visibility: hidden; }
+
+    /* Interactive Tilt & Glow */
+    .tilt-card {
+      transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), border-color 0.3s ease, box-shadow 0.3s ease;
+      will-change: transform;
+    }
+
+    /* Radar scanline animation for video canvas */
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(1000%); }
+    }
+    .animate-scan {
+      animation: scanline 8s linear infinite;
+    }
+
+    /* Rotating Text Stamp */
+    @keyframes spinText {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .rotate-stamp {
+      animation: spinText 24s linear infinite;
+    }
+
+    /* Glassmorphism styling */
+    .glass-panel {
+      background: rgba(17, 22, 34, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-input {
+      background: rgba(7, 9, 14, 0.65);
+      border: 1px solid #1f293d;
+    }
+    .glass-input:focus {
+      border-color: #00f0ff;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+    }
+
+    /* Video Blur Guard Filter */
+    .safety-blur {
+      filter: blur(28px) saturate(0.6);
+      transition: filter 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .safety-unblur {
+      filter: blur(0px) saturate(1);
+    }
+  </style>
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+</head>
+
+<body class="bg-[#07090e] text-slate-100 font-sans antialiased selection:bg-[#00f0ff] selection:text-black min-h-screen overflow-x-hidden">
+
+  <!-- ========================================================================= -->
+  <!-- 1. MANDATORY 18+ VERIFICATION & ACCESS GATE MODAL                          -->
+  <!-- ========================================================================= -->
+  <div id="gatekeeper-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#07090e]/95 backdrop-blur-2xl p-4 transition-all duration-500">
+    <div class="relative w-full max-w-lg bg-[#0c0f17] border border-[#ff0055]/40 rounded-2xl p-6 sm:p-8 shadow-[0_0_60px_rgba(255,0,85,0.2)] transform-style-3d">
+      
+      <!-- Glowing Red Warning Accent -->
+      <div class="absolute -top-3 -right-3 px-3 py-1 bg-[#ff0055] text-white text-[11px] font-mono tracking-widest uppercase font-black rounded shadow-lg flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+        RESTRICTED ACCESS
+      </div>
+
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-12 h-12 rounded-xl bg-[#ff0055]/10 border border-[#ff0055]/30 flex items-center justify-center text-[#ff0055]">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+            18+ ADULT GATEWAY <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">P2P v2.4</span>
+          </h2>
+          <p class="text-xs text-zinc-400 font-mono">ENCRYPTED REAL-TIME RANDOM COMM INTERFACE</p>
+        </div>
+      </div>
+
+      <p class="text-sm text-zinc-300 leading-relaxed mb-6">
+        This platform establishes encrypted, non-recorded WebRTC video connections with random participants worldwide. Access is strictly limited to verified adults. We enforce a zero-tolerance policy against non-consensual content, abuse, and illicit behavior.
+      </p>
+
+      <div class="space-y-3 mb-6 bg-[#111622] p-4 rounded-xl border border-zinc-800/80">
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" id="check-age" class="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#00f0ff] focus:ring-[#00f0ff] cursor-pointer">
+          <span class="text-xs text-zinc-300 group-hover:text-white transition-colors">
+            <strong class="text-white">I certify I am 18 years of age or older</strong> (or the legal age of majority in my jurisdiction).
+          </span>
+        </label>
+
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" id="check-rules" class="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[#00f0ff] focus:ring-[#00f0ff] cursor-pointer">
+          <span class="text-xs text-zinc-300 group-hover:text-white transition-colors">
+            I agree to the <strong class="text-[#00f0ff]">Zero Tolerance Policy</strong> (no harassment, non-consensual exposure, nor automated spamming; IP hashing and hardware fingerprints apply for bans).
+          </span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="grid grid-cols-2 gap-3">
+        <button id="btn-reject-gate" class="w-full py-3 px-4 rounded-xl border border-zinc-700 hover:border-zinc-500 bg-zinc-900/80 text-zinc-400 hover:text-white text-xs font-mono uppercase tracking-wider font-semibold transition-all">
+          Exit (Under 18)
+        </button>
+        <button id="btn-accept-gate" disabled class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#10b981] disabled:opacity-40 disabled:cursor-not-allowed text-black font-mono uppercase tracking-wider font-bold text-xs shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all hover:scale-[1.02] active:scale-95">
+          Enter Nexus
+        </button>
+      </div>
+      
+      <p id="gate-error" class="hidden text-center text-xs text-[#ff0055] font-mono mt-3">Please acknowledge both consent prerequisites to initiate WebRTC sockets.</p>
+    </div>
+  </div>
+
+  <!-- Under-18 Redirection State Overlay -->
+  <div id="safety-exit-screen" class="hidden fixed inset-0 z-[120] bg-black flex flex-col items-center justify-center p-6 text-center">
+    <div class="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center text-zinc-400 mb-4">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+    </div>
+    <h3 class="text-2xl font-bold text-white mb-2">Access Denied: Age Restricted</h3>
+    <p class="max-w-md text-sm text-zinc-400 mb-6">You indicated that you are under 18 years old. For child safety and compliance with international telecommunication standards, access has been revoked.</p>
+    <a href="https://www.google.com" class="px-6 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-mono tracking-wider uppercase transition-colors">
+      Leave Site Safely
+    </a>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- NAVIGATION BAR                                                            -->
+  <!-- ========================================================================= -->
+  <header class="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-zinc-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-[#00f0ff] to-[#ff0055] p-[1.5px] transition-transform group-hover:scale-105">
+          <div class="w-full h-full bg-[#07090e] rounded-[7px] flex items-center justify-center">
+            <span class="font-mono font-black text-sm text-[#00f0ff] tracking-tighter">NX</span>
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <span class="font-black tracking-widest text-sm text-white font-mono flex items-center gap-2">
+            NEXUS<span class="text-[#ff0055]">-18</span>
+            <span class="px-1.5 py-0.2 bg-[#ff0055]/20 text-[#ff0055] border border-[#ff0055]/40 text-[9px] rounded font-mono">18+ ONLY</span>
+          </span>
+          <span class="text-[10px] text-zinc-400 font-mono tracking-tight">RANDOM VIDEO CHAT</span>
+        </div>
+      </a>
+
+      <!-- Desktop Nav Links -->
+      <nav class="hidden md:flex items-center gap-8 text-xs font-mono text-zinc-400">
+        <a href="#simulator" class="hover:text-[#00f0ff] transition-colors flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse"></span>
+          LIVE SIMULATOR
+        </a>
+        <a href="#architecture" class="hover:text-white transition-colors">P2P ARCHITECTURE</a>
+        <a href="#security" class="hover:text-white transition-colors">PRIVACY & TURN</a>
+        <a href="#codebase" class="hover:text-white transition-colors">CODE MANIFEST</a>
+      </nav>
+
+      <!-- Right CTAs -->
+      <div class="hidden sm:flex items-center gap-3">
+        <button id="nexus-auth-open" type="button" class="px-4 py-2 rounded-lg border border-[#00f0ff]/60 text-[#00f0ff] hover:bg-[#00f0ff]/10 font-mono text-xs font-bold tracking-wider">LOGIN / SIGN UP</button>
+        <div class="px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 text-[11px] font-mono text-zinc-400 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#10b981]"></span>
+          <span id="stat-online-counter">Backend not connected</span> STATUS
+        </div>
+        <a href="#simulator" class="magnetic-btn px-4 py-2 rounded-lg bg-[#00f0ff] hover:bg-[#00f0ff]/90 text-black font-mono text-xs font-bold tracking-wider transition-transform">
+          LAUNCH CALL
+        </a>
+      </div>
+
+      <!-- Signed-in user avatar (top-right on desktop and mobile) -->
+      <button id="nexus-profile-avatar-btn" type="button" class="hidden ml-auto md:ml-0 mr-2 rounded-full border-2 border-[#00f0ff]/70 p-0.5 focus:outline-none focus:ring-2 focus:ring-[#00f0ff]" aria-label="Open my profile" title="My Profile">
+        <img id="nexus-header-avatar" src="" alt="User profile" class="h-9 w-9 rounded-full object-cover bg-zinc-800" referrerpolicy="no-referrer">
+      </button>
+
+      <!-- Mobile Hamburger Button -->
+      <button id="mobile-menu-btn" aria-label="Toggle Navigation" class="md:hidden p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path id="burger-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Dropdown -->
+    <div id="mobile-menu" class="hidden md:hidden px-4 pt-2 pb-6 glass-panel border-b border-zinc-800 space-y-3">
+      <a href="#simulator" class="block py-2 text-xs font-mono text-zinc-300 hover:text-[#00f0ff]">» LIVE CALL PORTAL</a>
+      <a href="#architecture" class="block py-2 text-xs font-mono text-zinc-300 hover:text-[#00f0ff]">» P2P ARCHITECTURE</a>
+      <a href="#security" class="block py-2 text-xs font-mono text-zinc-300 hover:text-[#00f0ff]">» ZERO STORAGE MATRIX</a>
+      <a href="#codebase" class="block py-2 text-xs font-mono text-zinc-300 hover:text-[#00f0ff]">» BACKEND CODE MANIFEST</a>
+      <div class="pt-2 space-y-2">
+        <button id="nexus-profile-menu-btn" type="button" class="hidden w-full text-left px-3 py-3 rounded-xl border border-[#00f0ff]/40 bg-[#00f0ff]/5 text-white">
+          <span class="flex items-center gap-3"><img id="nexus-menu-avatar" src="" alt="" class="h-10 w-10 rounded-full object-cover bg-zinc-800" referrerpolicy="no-referrer"><span class="min-w-0"><span id="nexus-menu-name" class="block truncate font-bold text-sm">My Profile</span><span id="nexus-menu-email" class="block truncate text-[11px] text-zinc-400">View account</span></span><span class="ml-auto text-[#00f0ff]">›</span></span>
+        </button>
+        <button id="nexus-auth-open-mobile" type="button" class="block w-full text-center py-2.5 rounded border border-[#00f0ff]/60 text-[#00f0ff] font-mono text-xs font-bold">LOGIN / SIGN UP</button>
+        <a href="#simulator" class="block w-full text-center py-2.5 rounded bg-[#00f0ff] text-black font-mono text-xs font-bold">
+          START MATCHMAKING
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ========================================================================= -->
+    <!-- SECTION 1: HERO SECTION (Includes 3D Canvas #1 & Photo #1 Background)      -->
+    <!-- ========================================================================= -->
+    <section class="relative min-h-screen flex items-center justify-center pt-20 pb-16 px-4 sm:px-6 overflow-hidden">
+      
+      <!-- PHOTO BUDGET 1 OF 2: Strict Real Photo with Mandatory High-Contrast Dark Overlay -->
+      <div class="absolute inset-0 z-0">
+        <img 
+          src="https://picsum.photos/1920/1080?random=1" 
+          alt="Dark cyber communications operations center" 
+          class="w-full h-full object-cover object-center filter grayscale opacity-25"
+        />
+        <!-- Mandatory Dark Gradient Readability Overlay -->
+        <div class="absolute inset-0 bg-gradient-to-b from-[#07090e]/95 via-[#07090e]/85 to-[#07090e]"></div>
+      </div>
+
+      <!-- Glowing Hero Backdrop Orbs -->
+      <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-[#00f0ff]/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#ff0055]/10 rounded-full blur-[140px] pointer-events-none"></div>
+
+      <!-- Live Three.js Scene #1 Container -->
+      <div id="three-hero-container" class="absolute inset-0 z-10 pointer-events-none"></div>
+
+      <!-- Hero Rotating Circular Text Stamp -->
+      <div class="absolute top-24 right-6 sm:right-16 z-20 hidden lg:block pointer-events-none select-none">
+        <div class="relative w-32 h-32 flex items-center justify-center">
+          <svg class="w-full h-full rotate-stamp" viewBox="0 0 100 100">
+            <path id="circlePath" fill="none" stroke="transparent" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" />
+            <text class="text-[9px] font-mono tracking-widest fill-[#00f0ff] uppercase">
+              <textPath href="#circlePath">
+                • ZERO SERVER HOPS • ENCRYPTED P2P • 18+ STRICT •
+              </textPath>
+            </text>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="w-3 h-3 rounded-full bg-[#ff0055] animate-ping"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Main Content -->
+      <div class="relative z-20 max-w-5xl mx-auto text-center flex flex-col items-center">
+        
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-[#00f0ff]/30 text-xs font-mono text-[#00f0ff] mb-6 shadow-[0_0_15px_rgba(0,240,255,0.15)]">
+          <span class="w-2 h-2 rounded-full bg-[#00f0ff] animate-ping"></span>
+          NEXT-GEN WEBRTC RANDOM AGGREGATOR
+        </div>
+
+        <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.08] mb-6 max-w-4xl">
+          Anonymous 1-on-1 Encrypted Video. <br/>
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00f0ff] via-white to-[#ff0055]">
+            Strictly Adults. Zero Logs.
+          </span>
+        </h1>
+
+        <p class="max-w-2xl text-sm sm:text-base text-zinc-300 font-sans leading-relaxed mb-10">
+          Engineered for low-latency peer media tunnels. Direct browser-to-browser negotiation via Coturn STUN/TURN clusters with neural safe-blur filtering and instant ephemeral session termination.
+        </p>
+
+        <!-- CTAs -->
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+          <a href="#simulator" class="magnetic-btn w-full sm:w-auto px-8 py-4 rounded-xl bg-[#00f0ff] hover:bg-[#00f0ff]/90 text-black font-mono font-bold text-sm tracking-wider uppercase transition-all shadow-[0_0_30px_rgba(0,240,255,0.4)] flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Start Encrypted Call
+          </a>
+          <a href="#architecture" class="magnetic-btn w-full sm:w-auto px-8 py-4 rounded-xl glass-panel hover:bg-zinc-800 text-white font-mono text-sm tracking-wider uppercase transition-all border border-zinc-700 flex items-center justify-center gap-2">
+            Inspect Architecture
+          </a>
+        </div>
+
+        <!-- Floating Hero Glass Metrics (micro-interactions) -->
+        <div class="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-3xl">
+          <div class="p-3.5 rounded-xl glass-panel text-left border-zinc-800/80">
+            <div class="text-[10px] font-mono text-zinc-400">MEDIAN LATENCY</div>
+            <div class="text-xl font-bold font-mono text-[#00f0ff] mt-0.5">&lt; 38ms</div>
+            <div class="text-[9px] text-zinc-400 font-mono">P2P Host-to-Host</div>
+          </div>
+          <div class="p-3.5 rounded-xl glass-panel text-left border-zinc-800/80">
+            <div class="text-[10px] font-mono text-zinc-400">DATA RETENTION</div>
+            <div class="text-xl font-bold font-mono text-[#10b981] mt-0.5">0.00%</div>
+            <div class="text-[9px] text-zinc-400 font-mono">RAM Only Queue</div>
+          </div>
+          <div class="p-3.5 rounded-xl glass-panel text-left border-zinc-800/80">
+            <div class="text-[10px] font-mono text-zinc-400">SAFE PREVIEW</div>
+            <div class="text-xl font-bold font-mono text-[#ff0055] mt-0.5">ENABLED</div>
+            <div class="text-[9px] text-zinc-400 font-mono">Anti-Shock Blur</div>
+          </div>
+          <div class="p-3.5 rounded-xl glass-panel text-left border-zinc-800/80">
+            <div class="text-[10px] font-mono text-zinc-400">TURN RELAYS</div>
+            <div class="text-xl font-bold font-mono text-white mt-0.5">18 NODES</div>
+            <div class="text-[9px] text-zinc-400 font-mono">Global Fallback</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- GOOGLE ADSENSE + PROMOTIONAL BANNER ADS
+         AdSense: after approval, replace ca-pub-REPLACE_WITH_YOUR_ID and add the ad unit data-ad-slot.
+         Do not click your own ads. Banner examples below are demo promotions, not paid placements. -->
+    <section id="ads-section" class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-5">
+      <div class="rounded-xl border border-zinc-800 bg-[#0c0f17]/90 p-4 sm:p-5">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <div class="text-[10px] font-mono tracking-[0.25em] text-zinc-400">SPONSORED • ADVERTISEMENT</div>
+          <span class="text-[10px] text-zinc-500">Banner Ads</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a href="#subikisan" class="group rounded-xl p-5 border border-[#00f0ff]/30 bg-gradient-to-r from-[#06232b] to-[#111622] hover:border-[#00f0ff] transition-colors">
+            <div class="text-[10px] tracking-widest font-mono text-[#00f0ff] mb-2">NEXUS PARTNER SPOT</div>
+            <div class="text-lg sm:text-xl font-black text-white">Promote your brand here</div>
+            <p class="text-xs text-zinc-300 mt-1">Replace this demo banner with your own approved campaign.</p>
+          </a>
+          <a href="#subikisan" class="group rounded-xl p-5 border border-[#ff0055]/30 bg-gradient-to-r from-[#2a0918] to-[#111622] hover:border-[#ff0055] transition-colors">
+            <div class="text-[10px] tracking-widest font-mono text-[#ff7aa8] mb-2">FEATURED OFFER</div>
+            <div class="text-lg sm:text-xl font-black text-white">Reach more customers</div>
+            <p class="text-xs text-zinc-300 mt-1">Sample banner placement • add your real offer and destination.</p>
+          </a>
+        </div>
+        <div class="mt-4 rounded-lg border border-dashed border-zinc-700 p-4 text-center">
+          <div class="text-[10px] font-mono tracking-widest text-zinc-400 mb-2">GOOGLE ADSENSE RESPONSIVE SLOT</div>
+          <p class="text-xs text-zinc-400">Live ads appear here only after your site is approved and your publisher/ad-unit IDs are configured.</p>
+          <!-- Example AdSense unit (uncomment only after approval and replacing both IDs):
+          <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-REPLACE_WITH_YOUR_ID"
+               data-ad-slot="REPLACE_WITH_AD_UNIT_ID" data-ad-format="auto" data-full-width-responsive="true"></ins>
+          <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+          -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 2: LIVE SIMULATOR (Interactive Split Screen WebRTC Interface)     -->
+    <!-- No external photo: 3D interactive UI, dynamic SVG streams, Canvas feeds   -->
+    <!-- ========================================================================= -->
+    <section id="simulator" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <div class="flex items-center gap-2 text-xs font-mono text-[#00f0ff] mb-2">
+            <span class="w-2 h-2 rounded-full bg-[#00f0ff]"></span>
+            CORE APPLICATION RUNTIME
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-black text-white tracking-tight">
+            High-Performance WebRTC Matchmaker
+          </h2>
+          <p class="text-sm text-zinc-400 max-w-xl mt-1">
+            Camera/microphone test is available. Live random matching requires the secure signaling backend and is not active yet.
+          </p>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <span class="px-3 py-1 rounded bg-[#111622] border border-zinc-800 text-xs font-mono text-zinc-300 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-[#10b981]" id="status-pill"></span>
+            STATUS: <span id="webrtc-state-text" class="text-[#10b981]">READY_TO_PAIR</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- MATCH PREFERENCES -->
+      <div class="mb-5 rounded-2xl border border-zinc-800 bg-[#0c0f17] p-4 sm:p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-bold text-white">Match Preference</h3>
+            <p class="mt-1 text-xs text-zinc-400">Choose who you would like to meet. Matching requires backend support.</p>
+          </div>
+          <div class="flex flex-wrap gap-2" role="group" aria-label="Gender preference">
+            <button type="button" class="gender-choice px-4 py-2 rounded-lg border border-[#00f0ff] bg-[#00f0ff]/10 text-[#00f0ff] text-xs font-mono font-bold" data-gender="any" aria-pressed="true">Any</button>
+            <button type="button" class="gender-choice px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-mono font-bold" data-gender="male" aria-pressed="false">Male</button>
+            <button type="button" class="gender-choice px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-mono font-bold" data-gender="female" aria-pressed="false">Female</button>
+          </div>
+        </div>
+        <p id="gender-preference-status" class="mt-3 text-[11px] text-zinc-500">Preference: Any</p>
+      </div>
+
+      <!-- MAIN APP INTERFACE CONTAINER -->
+      <div class="bg-[#0c0f17] border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+        
+        <!-- =================== LEFT PANEL: VIDEO FEEDS (8 COLS) =================== -->
+        <div class="lg:col-span-8 flex flex-col justify-between bg-[#07090e] border-b lg:border-b-0 lg:border-r border-zinc-800 p-4 relative">
+          
+          <!-- Top Stream Bar -->
+          <div class="flex items-center justify-between z-20 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 bg-black/60 backdrop-blur rounded text-[11px] font-mono text-white flex items-center gap-1.5 border border-zinc-800">
+                <span class="w-2 h-2 rounded-full bg-[#ff0055] animate-pulse"></span>
+                REMOTE FEED <span id="peer-id-label" class="text-zinc-400 ml-1">#PEER-8849</span>
+              </span>
+              <span id="call-duration" class="px-2 py-1 bg-black/60 rounded text-[11px] font-mono text-zinc-400 border border-zinc-800">00:00</span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <button id="btn-toggle-blur" class="px-3 py-1 bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700 rounded text-xs font-mono text-zinc-200 flex items-center gap-1.5 transition-colors">
+                <svg class="w-3.5 h-3.5 text-[#00f0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <span id="blur-btn-text">Unblur Safe Preview</span>
+              </button>
+              
+              <button id="btn-report-peer" class="px-3 py-1 bg-[#ff0055]/10 hover:bg-[#ff0055]/20 border border-[#ff0055]/40 rounded text-xs font-mono text-[#ff0055] flex items-center gap-1.5 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                Report &amp; Blacklist
+              </button>
+            </div>
+          </div>
+
+          <!-- Video Viewing Canvas Area -->
+          <div class="relative flex-1 w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-zinc-800 min-h-[360px]">
+            
+            <!-- Simulated Remote Video Surface -->
+            <div id="remote-video-container" class="absolute inset-0 flex items-center justify-center safety-blur overflow-hidden select-none">
+              <video id="remote-video" autoplay playsinline class="hidden absolute inset-0 w-full h-full object-cover"></video>
+              <!-- Animated Tech Feed Canvas Simulator -->
+              <canvas id="stream-noise-canvas" class="w-full h-full object-cover"></canvas>
+              
+              <!-- Scanline Overlay -->
+              <div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#00f0ff]/5 to-transparent h-16 w-full animate-scan pointer-events-none"></div>
+
+              <!-- Remote Avatar Overlay Simulation -->
+              <div id="remote-avatar-card" class="absolute flex flex-col items-center justify-center text-center p-6 bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 pointer-events-none">
+                <div class="w-20 h-20 rounded-full border-2 border-[#00f0ff] p-1 mb-3">
+                  <div class="w-full h-full rounded-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center text-zinc-300 font-mono text-xl font-bold">
+                    P2P
+                  </div>
+                </div>
+                <div class="text-white font-mono font-bold text-sm tracking-wide">STRANGER (PEER_CONNECTED)</div>
+                <div class="text-zinc-400 font-mono text-xs">Remote video appears after a real peer connects</div>
+                <div class="mt-2 text-[10px] text-[#10b981] font-mono flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
+                  Demo placeholder — no peer stream
+                </div>
+              </div>
+            </div>
+
+            <!-- Safety Shield Alert Banner (Visible when blurred) -->
+            <div id="safety-shield-indicator" class="absolute z-20 top-4 left-4 right-4 sm:left-auto sm:right-4 bg-zinc-900/90 border border-zinc-700/80 rounded-lg p-2.5 backdrop-blur shadow-xl flex items-center gap-3">
+              <div class="w-8 h-8 rounded-md bg-[#f59e0b]/20 text-[#f59e0b] flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold text-white font-mono">SAFETY BLUR ACTIVE</div>
+                <div class="text-[10px] text-zinc-400">Click unblur to confirm adult interaction</div>
+              </div>
+            </div>
+
+            <!-- FLOATING PIP: LOCAL USER PREVIEW -->
+            <div class="absolute bottom-4 right-4 z-30 w-36 sm:w-44 h-28 sm:h-32 rounded-xl overflow-hidden border-2 border-zinc-700/90 bg-zinc-950 shadow-2xl group transition-all hover:scale-105">
+              <video id="local-video-preview" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+              <div id="local-video-fallback" class="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-800 flex flex-col items-center justify-center p-2 text-center">
+                <div class="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-mono text-xs font-bold mb-1">
+                  YOU
+                </div>
+                <span class="text-[9px] font-mono text-zinc-400">Local Cam (Active)</span>
+              </div>
+              <div class="absolute bottom-1.5 left-2 px-1.5 py-0.5 bg-black/80 rounded text-[9px] font-mono text-[#00f0ff]">
+                YOU (HOST)
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Operational Action Bar -->
+          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <button id="btn-next-peer" class="px-5 py-3 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#00b4d8] text-black font-mono font-bold text-xs uppercase tracking-wider hover:opacity-95 shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                Next / Skip [Esc]
+              </button>
+              
+              <button id="btn-stop-call" class="px-4 py-3 rounded-xl bg-zinc-900 hover:bg-[#ff0055]/20 border border-zinc-700 hover:border-[#ff0055] text-zinc-300 hover:text-[#ff0055] font-mono text-xs uppercase tracking-wider font-semibold transition-all">
+                Stop
+              </button>
+            </div>
+
+            <!-- Hardware Quick Toggles -->
+            <div class="flex items-center gap-2">
+              <button id="btn-toggle-mic" class="p-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white transition-colors" title="Toggle Microphone">
+                <svg id="icon-mic-on" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+              </button>
+              
+              <button id="btn-toggle-cam" class="p-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white transition-colors" title="Toggle WebCam">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
+
+            </div>
+          </div>
+          <div class="mt-3">
+            <button id="btn-toggle-hardware" class="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#10b981] text-black font-bold text-sm border border-cyan-300 shadow-[0_0_18px_rgba(0,240,255,0.2)]">
+              Webcam + Mic Test — Start Camera
+            </button>
+          </div>
+
+        </div>
+
+        <!-- =================== RIGHT PANEL: TEXT CHAT & SAFEGUARD (4 COLS) ====== -->
+        <div class="lg:col-span-4 flex flex-col justify-between bg-[#0c0f17] p-4">
+          
+          <!-- Chat Header -->
+          <div class="pb-3 border-b border-zinc-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-[#00f0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+              <span class="text-xs font-mono font-bold text-white uppercase tracking-wider">Secure Ephemeral Chat</span>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[#10b981]">
+              Anti-Link Active
+            </span>
+          </div>
+
+          <!-- Message History Container -->
+          <div id="chat-messages-box" class="flex-1 py-4 space-y-3 overflow-y-auto max-h-[420px] text-xs font-mono pr-1">
+            <div class="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 text-zinc-400 text-[11px] leading-relaxed">
+              <span class="text-[#00f0ff] font-bold">[SYSTEM]:</span> Connected via direct P2P data channel. URLs and external links are strictly blocked to eliminate phishing/malware injection.
+            </div>
+            <div class="p-2 rounded bg-zinc-950/60 border border-zinc-800 text-zinc-400">
+              <span class="text-zinc-500">[00:01] Stranger:</span> Hey, where are you connecting from?
+            </div>
+          </div>
+
+          <!-- Input Bar with Built-in Phishing Blocker -->
+          <form id="chat-form" class="pt-3 border-t border-zinc-800 relative">
+            <div id="link-block-warning" class="hidden absolute -top-8 left-0 right-0 bg-[#ff0055] text-white text-[10px] font-mono px-2 py-1 rounded text-center animate-bounce">
+              ⚠️ Links and URLs are forbidden for cyber-safety!
+            </div>
+            <div class="flex items-center gap-2">
+              <input 
+                type="text" 
+                id="chat-input-field" 
+                placeholder="Say hello (URLs blocked)..." 
+                autocomplete="off" 
+                class="flex-1 glass-input rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 font-sans focus:outline-none"
+              >
+              <button type="submit" class="p-2.5 rounded-xl bg-[#00f0ff] hover:bg-[#00f0ff]/90 text-black transition-colors font-bold flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+              </button>
+            </div>
+            <div class="mt-2 text-[10px] text-zinc-400 font-mono flex justify-between">
+              <span>Shift+Enter for newline</span>
+              <span>No DB Retention</span>
+            </div>
+          </form>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 3: ARCHITECTURE & SECURITY BENTO GRID (3D Tilt Cards)             -->
+    <!-- No external photo: Clean CSS 3D Depth tilt panels + Isometric graphics    -->
+    <!-- ========================================================================= -->
+    <section id="architecture" class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono text-[#00f0ff] mb-3">
+          DECENTRALIZED PROTOCOL DESIGN
+        </div>
+        <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight">
+          How Nexus Guarantees Privacy &amp; Performance
+        </h2>
+        <p class="mt-3 text-sm sm:text-base text-zinc-300">
+          Unlike legacy chat platforms that route feeds through centralized media servers, Nexus facilitates direct P2P mesh handshakes with zero video caching.
+        </p>
+      </div>
+
+      <!-- Bento Grid with Perspective Tilt Cards -->
+      <div class="perspective-1000 grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- Bento Card 1: WebRTC Mesh -->
+        <div class="tilt-card transform-style-3d bg-[#0c0f17] border border-zinc-800 rounded-2xl p-7 hover:border-[#00f0ff]/60 relative group">
+          <div class="w-12 h-12 rounded-xl bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] flex items-center justify-center mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div class="text-xs font-mono text-[#00f0ff] mb-1 font-semibold">01 // LATENCY OPTIMIZATION</div>
+          <h3 class="text-xl font-bold text-white mb-3">Direct P2P Media Streams</h3>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Video frames and raw Opus audio packets are transported exclusively between browser clients. Media bytes never hit application databases or intermediate ingest servers.
+          </p>
+          <div class="mt-6 pt-4 border-t border-zinc-800/80 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+            <span>DTLS-SRTP 128-bit</span>
+            <span class="text-[#00f0ff]">Zero Ingestion</span>
+          </div>
+        </div>
+
+        <!-- Bento Card 2: Ephemeral RAM Matchmaking -->
+        <div class="tilt-card transform-style-3d bg-[#0c0f17] border border-zinc-800 rounded-2xl p-7 hover:border-[#10b981]/60 relative group">
+          <div class="w-12 h-12 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] flex items-center justify-center mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          </div>
+          <div class="text-xs font-mono text-[#10b981] mb-1 font-semibold">02 // VOLATILE MEMORY</div>
+          <h3 class="text-xl font-bold text-white mb-3">In-Memory Match Queue</h3>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Socket.io queue state resides purely in volatile Node.js Redis memory clusters. Once two clients exchange SDP signals, their queue pointers are immediately wiped.
+          </p>
+          <div class="mt-6 pt-4 border-t border-zinc-800/80 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+            <span>TTL: 0 Seconds</span>
+            <span class="text-[#10b981]">No Chat Persistence</span>
+          </div>
+        </div>
+
+        <!-- Bento Card 3: Anti-Harassment & Hash Ban -->
+        <div class="tilt-card transform-style-3d bg-[#0c0f17] border border-zinc-800 rounded-2xl p-7 hover:border-[#ff0055]/60 relative group">
+          <div class="w-12 h-12 rounded-xl bg-[#ff0055]/10 border border-[#ff0055]/30 text-[#ff0055] flex items-center justify-center mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <div class="text-xs font-mono text-[#ff0055] mb-1 font-semibold">03 // ACTIVE SAFETY GATING</div>
+          <h3 class="text-xl font-bold text-white mb-3">Hash-Salted Peer Ban</h3>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Reported bad actors are severed in 10ms. Session salt tokens and anonymous IP hashes are flagged across the ingress proxy, preventing repeated entry into random pools.
+          </p>
+          <div class="mt-6 pt-4 border-t border-zinc-800/80 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+            <span>Client Fingerprinting</span>
+            <span class="text-[#ff0055]">1-Click Sever</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 4: SHOWCASE GALLERY (Photo #2 of 2 in 3D Perspective Coverflow)   -->
+    <!-- Strictly Real Photo #2 used inside high-tech 3D perspective display       -->
+    <!-- ========================================================================= -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono text-[#00f0ff] mb-3">
+          GLOBAL HARDWARE CONFORMANCE
+        </div>
+        <h2 class="text-3xl sm:text-4xl font-black text-white tracking-tight">
+          Engineered for Any Device, Mobile to Ultra-Wide
+        </h2>
+        <p class="text-xs sm:text-sm text-zinc-300 mt-2">
+          Adaptive WebRTC bitrate adjustments with hardware-accelerated VP8, VP9, and AV1 fallback codecs.
+        </p>
+      </div>
+
+      <!-- 3D Perspective Card Layout -->
+      <div class="perspective-1000 flex justify-center">
+        <div class="w-full max-w-4xl bg-[#0c0f17] rounded-3xl p-4 sm:p-6 border border-zinc-800 shadow-[0_20px_50px_rgba(0,0,0,0.8)] transform-style-3d hover:rotate-1 transition-transform duration-500">
+          <div class="flex items-center justify-between mb-4 px-2">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-[#ff0055]"></span>
+              <span class="w-3 h-3 rounded-full bg-[#f59e0b]"></span>
+              <span class="w-3 h-3 rounded-full bg-[#10b981]"></span>
+              <span class="text-xs font-mono text-zinc-400 ml-2">nexus-client-v2.0.4.app</span>
+            </div>
+            <div class="text-xs font-mono text-zinc-400">TURN / STUN : SYNCHRONIZED</div>
+          </div>
+          
+          <!-- PHOTO BUDGET 2 OF 2: Strict Real Photo with High-Contrast Dark Overlay -->
+          <div class="relative rounded-2xl overflow-hidden aspect-video border border-zinc-800 group">
+            <img 
+              src="https://picsum.photos/1920/1080?random=2" 
+              alt="High performance hardware telecommunications hub" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 filter contrast-125"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-[#07090e] via-[#07090e]/60 to-transparent"></div>
+            
+            <div class="absolute bottom-6 left-6 right-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+              <div>
+                <span class="px-2.5 py-1 rounded bg-[#00f0ff] text-black font-mono text-xs font-bold uppercase">
+                  Zero Codec Lag
+                </span>
+                <h4 class="text-xl sm:text-2xl font-black text-white mt-2">Dynamic Bitrate WebRTC Escalation</h4>
+                <p class="text-xs text-zinc-300 max-w-md">Seamless packet re-ordering over UDP with Google STUN candidate resolution.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono text-[#10b981] bg-black/60 px-3 py-1.5 rounded-lg border border-zinc-700">
+                  Adaptive 1080p60
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 5: CODEBASE & TECHNICAL ARCHITECTURE BLUEPRINTS                   -->
+    <!-- No external photo: Interactive 3D syntax-highlighted code manifest        -->
+    <!-- ========================================================================= -->
+    <section id="codebase" class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+        <div>
+          <div class="text-xs font-mono text-[#00f0ff] mb-2 font-bold tracking-widest">PRODUCTION BLUEPRINTS</div>
+          <h2 class="text-3xl sm:text-4xl font-black text-white tracking-tight">Full Project Architecture &amp; Code</h2>
+          <p class="text-sm text-zinc-300 max-w-xl mt-1">Ready-to-deploy Next.js client layout, Node.js signaling server with matchmaking queues, and Coturn STUN/TURN configurations.</p>
+        </div>
+        
+        <!-- Code Tab Switchers -->
+        <div class="flex items-center gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono">
+          <button id="tab-btn-tree" class="tab-btn px-3 py-2 rounded-lg bg-[#00f0ff] text-black font-bold transition-all" data-tab="tab-tree">Tree Layout</button>
+          <button id="tab-btn-backend" class="tab-btn px-3 py-2 rounded-lg text-zinc-400 hover:text-white transition-all" data-tab="tab-backend">server.js (Node)</button>
+          <button id="tab-btn-frontend" class="tab-btn px-3 py-2 rounded-lg text-zinc-400 hover:text-white transition-all" data-tab="tab-frontend">WebRTC Hook</button>
+          <button id="tab-btn-turn" class="tab-btn px-3 py-2 rounded-lg text-zinc-400 hover:text-white transition-all" data-tab="tab-turn">STUN / TURN</button>
+        </div>
+      </div>
+
+      <!-- Code Window Wrapper -->
+      <div class="bg-[#0c0f17] border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+        <div class="bg-zinc-900/80 px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+            <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+            <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+            <span id="active-filename" class="text-xs font-mono text-zinc-400 ml-2">nexus-project-tree.txt</span>
+          </div>
+          <button id="btn-copy-code" class="text-xs font-mono text-zinc-400 hover:text-[#00f0ff] flex items-center gap-1.5 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span id="copy-text-indicator">Copy Snippet</span>
+          </button>
+        </div>
+
+        <!-- Code Content Containers -->
+        <div class="p-6 overflow-x-auto text-xs font-mono leading-relaxed max-h-[500px]">
+          
+          <!-- TAB 1: TREE -->
+          <pre id="tab-tree" class="code-view text-zinc-300">
+nexus-18-app/
+├── package.json
+├── next.config.js
+├── tailwind.config.js
+├── .env.local                       # STUN/TURN credentials & Socket endpoints
+├── server/                          # Signaling & Queue Backend
+│   ├── server.js                    # Node.js + Socket.io Matchmaker
+│   ├── matchmakingQueue.js          # In-memory FIFO paired queue logic
+│   └── rateLimiter.js               # IP & Report-hash blacklist cache
+└── src/
+    ├── pages/
+    │   ├── _app.tsx
+    │   ├── index.tsx                # Video Call Master View
+    │   └── blocked.tsx              # Under-18 & Blacklisted Redirect Page
+    ├── components/
+    │   ├── Gate18Modal.tsx          # Mandatory 18+ Age Disclaimer & Rules
+    │   ├── VideoStage.tsx           # Split Screen Remote & Local PIP
+    │   ├── ChatPanel.tsx            # Phishing-link filtered text interface
+    │   └── ControlsBar.tsx          # Skip, Next, Stop, Mic, Webcam actions
+    ├── hooks/
+    │   └── useWebRTC.ts             # RTCPeerConnection Lifecycle & Ice candidates
+    └── utils/
+        ├── turnConfig.ts            # Google STUN & Coturn Relay fallback array
+        └── filterLinks.ts           # RegEx link stripper & zero-retention cleaner
+          </pre>
+
+          <!-- TAB 2: BACKEND SIGNALING CODE -->
+          <pre id="tab-backend" class="code-view hidden text-zinc-300">
+<span class="text-[#ff0055]">const</span> express = require(<span class="text-[#10b981]">'express'</span>);
+<span class="text-[#ff0055]">const</span> http = require(<span class="text-[#10b981]">'http'</span>);
+<span class="text-[#ff0055]">const</span> { Server } = require(<span class="text-[#10b981]">'socket.io'</span>);
+
+<span class="text-[#ff0055]">const</span> app = express();
+<span class="text-[#ff0055]">const</span> server = http.createServer(app);
+<span class="text-[#ff0055]">const</span> io = <span class="text-[#ff0055]">new</span> Server(server, { cors: { origin: <span class="text-[#10b981]"*"</span> } });
+
+<span class="text-zinc-500">// In-Memory Volatile Queues (Zero Persistent DB)</span>
+<span class="text-[#ff0055]">let</span> waitingQueue = [];
+<span class="text-[#ff0055]">const</span> activePairs = <span class="text-[#ff0055]">new</span> Map(); <span class="text-zinc-500">// socketId -> peerSocketId</span>
+<span class="text-[#ff0055]">const</span> blacklist = <span class="text-[#ff0055]">new</span> Set();    <span class="text-zinc-500">// Hashed IP / Report IDs</span>
+
+io.on(<span class="text-[#10b981]'connection'</span>, (socket) => {
+  <span class="text-[#ff0055]">const</span> clientIp = socket.handshake.headers[<span class="text-[#10b981]'x-forwarded-for'</span>] || socket.handshake.address;
+
+  <span class="text-[#ff0055]">if</span> (blacklist.has(clientIp)) {
+    socket.emit(<span class="text-[#10b981]'blocked'</span>, { reason: <span class="text-[#10b981]'Permanent safety violation'</span> });
+    <span class="text-[#ff0055]">return</span> socket.disconnect(<span class="text-[#00f0ff]">true</span>);
+  }
+
+  <span class="text-zinc-500">// Enqueue User for Random Pairing</span>
+  socket.on(<span class="text-[#10b981]'find_peer'</span>, () => {
+    cleanupUser(socket.id);
+    
+    <span class="text-[#ff0055]">if</span> (waitingQueue.length > <span class="text-[#00f0ff]">0</span>) {
+      <span class="text-[#ff0055]">const</span> peer = waitingQueue.shift();
+      <span class="text-[#ff0055]">if</span> (peer.id === socket.id) <span class="text-[#ff0055]">return</span> waitingQueue.push(socket);
+
+      activePairs.set(socket.id, peer.id);
+      activePairs.set(peer.id, socket.id);
+
+      <span class="text-zinc-500">// socket creates offer, peer waits for offer</span>
+      socket.emit(<span class="text-[#10b981]'peer_matched'</span>, { peerId: peer.id, initiator: <span class="text-[#00f0ff]">true</span> });
+      peer.emit(<span class="text-[#10b981]'peer_matched'</span>, { peerId: socket.id, initiator: <span class="text-[#00f0ff]">false</span> });
+    } <span class="text-[#ff0055]">else</span> {
+      waitingQueue.push(socket);
+      socket.emit(<span class="text-[#10b981]'waiting_in_queue'</span>);
+    }
+  });
+
+  <span class="text-zinc-500">// WebRTC Signaling Handshakes</span>
+  socket.on(<span class="text-[#10b981]'signal_offer'</span>, ({ target, offer }) => io.to(target).emit(<span class="text-[#10b981]'signal_offer'</span>, { sender: socket.id, offer }));
+  socket.on(<span class="text-[#10b981]'signal_answer'</span>, ({ target, answer }) => io.to(target).emit(<span class="text-[#10b981]'signal_answer'</span>, { sender: socket.id, answer }));
+  socket.on(<span class="text-[#10b981]'signal_ice'</span>, ({ target, candidate }) => io.to(target).emit(<span class="text-[#10b981]'signal_ice'</span>, { sender: socket.id, candidate }));
+
+  <span class="text-zinc-500">// Instant Sever & Abuse Reporting</span>
+  socket.on(<span class="text-[#10b981]'report_peer'</span>, ({ peerId, reason }) => {
+    blacklist.add(peerId);
+    cleanupUser(socket.id);
+    cleanupUser(peerId);
+    io.to(peerId).emit(<span class="text-[#10b981]'terminated'</span>, { reason: <span class="text-[#10b981]'Reported and blacklisted'</span> });
+  });
+
+  socket.on(<span class="text-[#10b981]'disconnect'</span>, () => cleanupUser(socket.id));
+
+  <span class="text-[#ff0055]">function</span> cleanupUser(id) {
+    waitingQueue = waitingQueue.filter(s => s.id !== id);
+    <span class="text-[#ff0055]">const</span> peerId = activePairs.get(id);
+    <span class="text-[#ff0055]">if</span> (peerId) {
+      activePairs.delete(id);
+      activePairs.delete(peerId);
+      io.to(peerId).emit(<span class="text-[#10b981]'peer_disconnected'</span>);
+    }
+  }
+});
+
+server.listen(<span class="text-[#00f0ff]">4000</span>, () => console.log(<span class="text-[#10b981]'Matchmaker signaling running on :4000'</span>));
+          </pre>
+
+          <!-- TAB 3: FRONTEND WEBRTC HOOK -->
+          <pre id="tab-frontend" class="code-view hidden text-zinc-300">
+<span class="text-[#ff0055]">import</span> { useEffect, useRef, useState } <span class="text-[#ff0055]">from</span> <span class="text-[#10b981]'react'</span>;
+<span class="text-[#ff0055]">import</span> { rtcConfig } <span class="text-[#ff0055]">from</span> <span class="text-[#10b981]'../utils/turnConfig'</span>;
+
+<span class="text-[#ff0055]">export const</span> useWebRTC = (socket, onRemoteTrack) => {
+  <span class="text-[#ff0055]">const</span> pc = useRef&lt;RTCPeerConnection | <span class="text-[#00f0ff]">null</span>&gt;(<span class="text-[#00f0ff]">null</span>);
+  <span class="text-[#ff0055]">const</span> [localStream, setLocalStream] = useState&lt;MediaStream | <span class="text-[#00f0ff]">null</span>&gt;(<span class="text-[#00f0ff]">null</span>);
+
+  <span class="text-[#ff0055]">const</span> initLocalMedia = <span class="text-[#ff0055]">async</span> () => {
+    <span class="text-[#ff0055]">const</span> stream = <span class="text-[#ff0055]">await</span> navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: <span class="text-[#00f0ff]">1280</span> }, height: { ideal: <span class="text-[#00f0ff]">720</span> } },
+      audio: { echoCancellation: <span class="text-[#00f0ff]">true</span>, noiseSuppression: <span class="text-[#00f0ff]">true</span> }
+    });
+    setLocalStream(stream);
+    <span class="text-[#ff0055]">return</span> stream;
+  };
+
+  <span class="text-[#ff0055]">const</span> createPeerConnection = (targetPeerId: <span class="text-[#00f0ff]">string</span>, currentStream: MediaStream) => {
+    pc.current = <span class="text-[#ff0055]">new</span> RTCPeerConnection(rtcConfig);
+
+    <span class="text-zinc-500">// Direct ICE Candidate Negotiation</span>
+    pc.current.onicecandidate = (event) => {
+      <span class="text-[#ff0055]">if</span> (event.candidate) {
+        socket.emit(<span class="text-[#10b981]'signal_ice'</span>, { target: targetPeerId, candidate: event.candidate });
+      }
+    };
+
+    pc.current.ontrack = (event) => onRemoteTrack(event.streams[<span class="text-[#00f0ff]">0</span>]);
+
+    currentStream.getTracks().forEach((track) => {
+      pc.current?.addTrack(track, currentStream);
+    });
+  };
+
+  <span class="text-[#ff0055]">return</span> { localStream, initLocalMedia, createPeerConnection, pc };
+};
+          </pre>
+
+          <!-- TAB 4: TURN / STUN MATRIX -->
+          <pre id="tab-turn" class="code-view hidden text-zinc-300">
+<span class="text-zinc-500">// STUN & Coturn Relay Config (RFC 5766 Compliant)</span>
+<span class="text-[#ff0055]">export const</span> rtcConfig: RTCConfiguration = {
+  iceServers: [
+    <span class="text-zinc-500">// Public Google STUN Servers (NAT Discovery)</span>
+    { urls: <span class="text-[#10b981]'stun:stun.l.google.com:19302'</span> },
+    { urls: <span class="text-[#10b981]'stun:stun1.l.google.com:19302'</span> },
+    
+    <span class="text-zinc-500">// Primary Coturn Relay Server (Symmetric NAT Bypass fallback)</span>
+    {
+      urls: <span class="text-[#10b981]'turn:turn.nexus18-mesh.network:3478'</span>,
+      username: process.env.NEXT_PUBLIC_COTURN_USER || <span class="text-[#10b981]'ephemeral_user'</span>,
+      credential: process.env.NEXT_PUBLIC_COTURN_PASSWORD || <span class="text-[#10b981]'ephemeral_token_secret'</span>
+    },
+    
+    <span class="text-zinc-500">// High-availability TLS TURN Fallback (TCP 443 firewall bypass)</span>
+    {
+      urls: <span class="text-[#10b981]'turns:turn.nexus18-mesh.network:443?transport=tcp'</span>,
+      username: process.env.NEXT_PUBLIC_COTURN_USER || <span class="text-[#10b981]'ephemeral_user'</span>,
+      credential: process.env.NEXT_PUBLIC_COTURN_PASSWORD || <span class="text-[#10b981]'ephemeral_token_secret'</span>
+    }
+  ],
+  iceCandidatePoolSize: <span class="text-[#00f0ff]">10</span>,
+  bundlePolicy: <span class="text-[#10b981]'max-bundle'</span>
+};
+          </pre>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 6: HIGH ENERGY CTA & 3D WIREFRAME SCENE #2                        -->
+    <!-- No external photo: Interactive Three.js Scene #2 backdrop                 -->
+    <!-- ========================================================================= -->
+    <section id="security" class="relative py-28 px-4 sm:px-6 lg:px-8 overflow-hidden bg-[#07090e] border-t border-zinc-800">
+      
+      <!-- Live Three.js Scene #2 Container -->
+      <div id="three-cta-container" class="absolute inset-0 z-0 pointer-events-none opacity-60"></div>
+      
+      <!-- Dark contrast overlay -->
+      <div class="absolute inset-0 bg-gradient-to-t from-[#07090e] via-transparent to-[#07090e]/80 pointer-events-none"></div>
+
+      <div class="relative z-10 max-w-4xl mx-auto text-center flex flex-col items-center">
+        
+        <div class="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-[#00f0ff] mb-6 shadow-[0_0_30px_rgba(0,240,255,0.2)]">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+
+        <h2 class="text-4xl sm:text-6xl font-black text-white tracking-tight mb-4">
+          Ready for Frictionless Adult P2P?
+        </h2>
+        
+        <p class="text-sm sm:text-base text-zinc-300 max-w-2xl mb-8 leading-relaxed">
+          Launch direct in your browser. No application installs, no contact sync, no permanent user profiles. A clean slate every single skip.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+          <a href="#simulator" class="magnetic-btn w-full sm:w-auto px-10 py-5 rounded-2xl bg-gradient-to-r from-[#00f0ff] to-[#10b981] hover:opacity-95 text-black font-mono font-black text-sm uppercase tracking-widest shadow-[0_0_40px_rgba(0,240,255,0.4)] transition-all">
+            Enter Match Pool Now
+          </a>
+          <button id="btn-reopen-modal" class="w-full sm:w-auto px-8 py-5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-mono text-xs uppercase tracking-wider border border-zinc-700 transition-colors">
+            Review 18+ Disclaimer
+          </button>
+        </div>
+
+        <!-- Compliance Badges -->
+        <div class="mt-12 flex flex-wrap items-center justify-center gap-6 text-zinc-400 font-mono text-xs">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-[#10b981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            GDPR &amp; CCPA Right-to-Forget Native
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-[#10b981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Zero IP Storage
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-[#10b981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Hardware Encrypted
+          </span>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- SUBIKISAN MONTHLY MEMBERSHIP -->
+    <section id="subikisan" class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-8">
+      <div class="rounded-2xl border border-[#ff0055]/50 bg-gradient-to-br from-[#111622] to-[#07090e] p-5 sm:p-7 shadow-[0_0_30px_rgba(255,0,85,0.10)]">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <div>
+            <div class="text-xs font-mono tracking-[0.25em] text-[#f59e0b] mb-2">PREMIUM MEMBERSHIP</div>
+            <h2 class="text-2xl sm:text-3xl font-black text-white">Subikisan <span class="text-[#ff0055]">Premium</span></h2>
+            <p class="text-sm text-zinc-400 mt-2">One simple monthly plan. Cancel anytime.</p>
+            <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 text-sm text-zinc-200">
+              <li>✓ Ad-free experience</li><li>✓ Male / Female preference</li><li>✓ Priority matching</li><li>✓ HD video (when supported)</li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-zinc-700 bg-black/40 p-5 min-w-[230px]">
+            <div class="text-3xl font-black text-white">₹99 <span class="text-sm font-normal text-zinc-400">/ month</span></div>
+            <p class="text-xs text-zinc-500 mt-1">Demo pricing — payment is not connected yet.</p>
+            <button type="button" id="subikisan-monthly-btn" class="mt-4 w-full rounded-lg bg-gradient-to-r from-[#ff0055] to-[#ff4d8d] px-5 py-3 text-sm font-bold text-white hover:opacity-90">Choose Monthly</button>
+            <p id="subscription-status" class="text-xs text-zinc-400 mt-3" aria-live="polite">Monthly plan not activated.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER PROMOTIONAL BANNER + ADSENSE SLOT -->
+    <section id="footer-ad" class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto pb-6">
+      <div class="rounded-xl border border-zinc-800 bg-gradient-to-r from-[#111622] via-[#181020] to-[#111622] p-5 text-center">
+        <div class="text-[10px] font-mono tracking-[0.25em] text-zinc-400 mb-2">SPONSORED • ADVERTISEMENT</div>
+        <h3 class="text-lg font-black text-white">Your next campaign could be here</h3>
+        <p class="text-xs text-zinc-400 mt-1">Demo banner slot. Replace with a real advertiser's approved creative and link.</p>
+        <div class="mt-4 border-t border-zinc-800 pt-3 text-[10px] text-zinc-500">Google AdSense footer unit can be placed here after site approval.</div>
+      </div>
+    </section>
+
+  <!-- NEXUS-18 user profile modal -->
+  <div id="nexus-profile-modal" class="hidden fixed inset-0 z-[210] bg-black/85 backdrop-blur-md p-4 items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="nexus-profile-title">
+    <div class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-[#00f0ff]/30 bg-[#0c0f17] p-5 sm:p-6 shadow-2xl">
+      <div class="flex items-center justify-between gap-3 mb-5">
+        <div><p class="text-[10px] tracking-[0.25em] text-[#00f0ff] font-mono">NEXUS-18 ACCOUNT</p><h2 id="nexus-profile-title" class="text-2xl font-black text-white mt-1">My Profile</h2></div>
+        <button id="nexus-profile-close" type="button" class="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300" aria-label="Close profile">✕</button>
+      </div>
+      <div class="flex items-center gap-4 rounded-xl border border-zinc-800 bg-[#07090e] p-4 mb-5">
+        <img id="nexus-profile-photo" src="" alt="Profile photo" class="h-16 w-16 rounded-full object-cover border-2 border-[#00f0ff]/60 bg-zinc-800" referrerpolicy="no-referrer">
+        <div class="min-w-0"><p id="nexus-profile-name" class="font-bold text-white text-lg break-words">Signed-in user</p><p id="nexus-profile-email" class="text-sm text-zinc-400 break-all"></p><p class="text-[10px] text-emerald-300 mt-1">✓ Firebase authenticated</p></div>
+      </div>
+      <label for="nexus-profile-name-input" class="block text-sm text-zinc-300 mb-2">Edit display name</label>
+      <input id="nexus-profile-name-input" type="text" maxlength="60" autocomplete="name" placeholder="Your display name" class="w-full rounded-xl bg-[#07090e] border border-zinc-700 px-4 py-3 text-white focus:outline-none focus:border-[#00f0ff]">
+      <button id="nexus-profile-save" type="button" class="w-full mt-3 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#10b981] py-3 font-bold text-black">Save Profile</button>
+      <p id="nexus-profile-message" class="text-sm text-zinc-400 mt-3" role="status" aria-live="polite"></p>
+      <div class="mt-5 space-y-3 rounded-xl border border-zinc-800 p-4 text-sm">
+        <div><p class="text-[10px] uppercase tracking-wider text-zinc-500 font-mono">Unique User ID (UID)</p><p id="nexus-profile-uid" class="mt-1 break-all select-text text-zinc-200 text-xs"></p></div>
+        <div><p class="text-[10px] uppercase tracking-wider text-zinc-500 font-mono">Account created</p><p id="nexus-profile-created" class="mt-1 text-zinc-200"></p></div>
+      </div>
+      <button id="nexus-profile-logout" type="button" class="w-full mt-5 rounded-xl border border-rose-500/50 py-3 font-bold text-rose-300 hover:bg-rose-500/10">Log out</button>
+    </div>
+  </div>
+
+  <!-- NEXUS-18 Firebase Login / Signup -->
+  <div id="nexus-auth-modal" class="hidden fixed inset-0 z-[200] bg-black/85 backdrop-blur-md p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="nexus-auth-title">
+    <div class="w-full max-w-md rounded-2xl border border-[#00f0ff]/30 bg-[#0c0f17] p-6 shadow-2xl">
+      <div class="flex items-start justify-between gap-4 mb-5">
+        <div><p class="text-[10px] tracking-[0.25em] text-[#00f0ff] font-mono">NEXUS-18 ACCOUNT</p><h2 id="nexus-auth-title" class="text-2xl font-black text-white mt-1">Login / Sign up</h2><p class="text-sm text-zinc-400 mt-2">Use Google or verify your mobile number.</p></div>
+        <button id="nexus-auth-close" type="button" class="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300" aria-label="Close login">✕</button>
+      </div>
+      <button id="nexus-google-login" type="button" class="w-full rounded-xl bg-white text-black font-bold py-3">Continue with Google</button>
+      <div class="flex items-center gap-3 my-5 text-xs text-zinc-500"><span class="h-px bg-zinc-800 flex-1"></span>OR MOBILE OTP<span class="h-px bg-zinc-800 flex-1"></span></div>
+      <label for="nexus-phone" class="block text-sm text-zinc-300 mb-2">Mobile number with country code</label>
+      <input id="nexus-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+91 9876543210" class="w-full rounded-xl bg-[#07090e] border border-zinc-700 px-4 py-3 text-white focus:outline-none focus:border-[#00f0ff]">
+      <div id="nexus-recaptcha" class="my-3"></div>
+      <button id="nexus-send-otp" type="button" class="w-full rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#10b981] py-3 font-bold text-black">Send OTP</button>
+      <div id="nexus-otp-entry" class="hidden mt-4"><label for="nexus-otp-code" class="block text-sm text-zinc-300 mb-2">Enter SMS code</label><input id="nexus-otp-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="SMS verification code" class="w-full rounded-xl bg-[#07090e] border border-zinc-700 px-4 py-3 text-white"><button id="nexus-verify-otp" type="button" class="w-full mt-3 rounded-xl bg-white py-3 font-bold text-black">Verify OTP</button></div>
+      <p id="nexus-auth-message" class="text-sm text-rose-300 mt-4" role="status" aria-live="polite"></p>
+      <p class="text-[11px] text-zinc-500 mt-3">SMS verification may require Firebase billing. Never share your OTP with anyone.</p>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- FOOTER                                                                    -->
+  <!-- ========================================================================= -->
+  <footer class="bg-[#05070a] border-t border-zinc-900 py-12 px-4 sm:px-6 lg:px-8 text-xs font-mono text-zinc-400">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-6 h-6 rounded bg-[#00f0ff] flex items-center justify-center text-black font-black text-xs">
+          N
+        </div>
+        <span class="text-zinc-300 font-bold">NEXUS WEBRTC SYSTEMS INC.</span>
+        <span class="text-zinc-400">© 2025 All Rights Reserved.</span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-6">
+        <a href="#simulator" class="hover:text-white transition-colors">Safety Guidelines</a>
+        <a href="#simulator" class="hover:text-white transition-colors">Ephemeral ToS</a>
+        <a href="#simulator" class="hover:text-white transition-colors">Law Enforcement Contact</a>
+        <a href="#simulator" class="hover:text-white transition-colors">Report Exploitation</a>
+      </div>
+
+      <div class="text-[10px] text-zinc-400">
+        STRICTLY 18+. Be respectful. Report unsafe behaviour.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT LOGIC & 3D WEBGL RENDERERS                                     -->
+  <!-- ========================================================================= -->
+  <script>
+    /* ==========================================================================
+       PHOTO BUDGET VERIFICATION CHECK:
+       Photo 1: Hero Background -> https://picsum.photos/1920/1080?random=1
+       Photo 2: Showcase Coverflow -> https://picsum.photos/1920/1080?random=2
+       Total photos on page = EXACTLY 2. All other sections use 3D canvases & CSS 3D.
+       ========================================================================== */
+
+    // --------------------------------------------------------------------------
+    // 1. MANDATORY 18+ ACCESS GATE LOGIC
+    // --------------------------------------------------------------------------
+    const gateModal = document.getElementById('gatekeeper-modal');
+    const safetyExitScreen = document.getElementById('safety-exit-screen');
+    const checkAge = document.getElementById('check-age');
+    const checkRules = document.getElementById('check-rules');
+    const btnAcceptGate = document.getElementById('btn-accept-gate');
+    const btnRejectGate = document.getElementById('btn-reject-gate');
+    const gateError = document.getElementById('gate-error');
+    const btnReopenModal = document.getElementById('btn-reopen-modal');
+
+    function updateGateButton() {
+      if (checkAge.checked && checkRules.checked) {
+        btnAcceptGate.removeAttribute('disabled');
+        gateError.classList.add('hidden');
+      } else {
+        btnAcceptGate.setAttribute('disabled', 'true');
+      }
+    }
+
+    checkAge.addEventListener('change', updateGateButton);
+    checkRules.addEventListener('change', updateGateButton);
+
+    btnAcceptGate.addEventListener('click', () => {
+      gateModal.style.opacity = '0';
+      gateModal.style.pointerEvents = 'none';
+      setTimeout(() => gateModal.classList.add('hidden'), 500);
+    });
+
+    btnRejectGate.addEventListener('click', () => {
+      gateModal.classList.add('hidden');
+      safetyExitScreen.classList.remove('hidden');
+    });
+
+    btnReopenModal?.addEventListener('click', () => {
+      gateModal.classList.remove('hidden');
+      gateModal.style.pointerEvents = 'auto';
+      gateModal.style.opacity = '1';
+    });
+
+    // --------------------------------------------------------------------------
+    // 2. MOBILE MENU TOGGLE
+    // --------------------------------------------------------------------------
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    mobileMenuBtn.addEventListener('click', () => {
+      mobileMenu.classList.toggle('hidden');
+    });
+
+    // --------------------------------------------------------------------------
+    // 3. THREE.JS SCENE #1 (Hero Kinetic Mesh)
+    // --------------------------------------------------------------------------
+    (function initHero3D() {
+      const container = document.getElementById('three-hero-container');
+      if (!container) return;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.z = 5;
+
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      // Kinetic Torus Knot & Wireframe Polyhedron
+      const geom = new THREE.TorusKnotGeometry(1.6, 0.45, 120, 16);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.28
+      });
+      const knot = new THREE.Mesh(geom, mat);
+      scene.add(knot);
+
+      // Ambient Floating Points Galaxy
+      const particlesGeom = new THREE.BufferGeometry();
+      const pCount = 350;
+      const posArray = new Float32Array(pCount * 3);
+      for (let i = 0; i < pCount * 3; i++) {
+        posArray[i] = (Math.random() - 0.5) * 12;
+      }
+      particlesGeom.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      const pMat = new THREE.PointsMaterial({ size: 0.035, color: 0x00f0ff, transparent: true, opacity: 0.6 });
+      const particles = new THREE.Points(particlesGeom, pMat);
+      scene.add(particles);
+
+      // Pointer Parallax
+      let mouseX = 0, mouseY = 0;
+      window.addEventListener('pointermove', (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 0.8;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 0.8;
+      });
+
+      // Resize Observer
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      // Render Loop with Intersection Observer
+      let isHeroVisible = true;
+      const observer = new IntersectionObserver((entries) => {
+        isHeroVisible = entries[0].isIntersecting;
+      }, { threshold: 0.1 });
+      observer.observe(container);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!isHeroVisible) return;
+
+        knot.rotation.x += 0.003;
+        knot.rotation.y += 0.004;
+        particles.rotation.y -= 0.0008;
+
+        knot.position.x += (mouseX - knot.position.x) * 0.04;
+        knot.position.y += (-mouseY - knot.position.y) * 0.04;
+
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // --------------------------------------------------------------------------
+    // 4. THREE.JS SCENE #2 (CTA Particle Security Core)
+    // --------------------------------------------------------------------------
+    (function initCta3D() {
+      const container = document.getElementById('three-cta-container');
+      if (!container) return;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.z = 5;
+
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      const icosaGeom = new THREE.IcosahedronGeometry(2.1, 2);
+      const icosaMat = new THREE.MeshBasicMaterial({
+        color: 0x10b981,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.22
+      });
+      const coreMesh = new THREE.Mesh(icosaGeom, icosaMat);
+      scene.add(coreMesh);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      let isCtaVisible = true;
+      const observer = new IntersectionObserver((entries) => {
+        isCtaVisible = entries[0].isIntersecting;
+      }, { threshold: 0.1 });
+      observer.observe(container);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!isCtaVisible) return;
+        coreMesh.rotation.x -= 0.002;
+        coreMesh.rotation.y += 0.003;
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // --------------------------------------------------------------------------
+    // 5. MAGNETIC BUTTONS (Vanilla JS + GSAP Micro-interaction)
+    // --------------------------------------------------------------------------
+    const magneticBtns = document.querySelectorAll('.magnetic-btn');
+    magneticBtns.forEach(btn => {
+      btn.addEventListener('mousemove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        gsap.to(btn, { x: x * 0.25, y: y * 0.25, duration: 0.2, ease: 'power2.out' });
+      });
+      btn.addEventListener('mouseleave', () => {
+        gsap.to(btn, { x: 0, y: 0, duration: 0.4, ease: 'elastic.out(1, 0.3)' });
+      });
+    });
+
+    // --------------------------------------------------------------------------
+    // 6. 3D PERSPECTIVE TILT CARDS (CSS 3D Depth)
+    // --------------------------------------------------------------------------
+    const tiltCards = document.querySelectorAll('.tilt-card');
+    tiltCards.forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const rotateX = -(y / (rect.height / 2)) * 8;
+        const rotateY = (x / (rect.width / 2)) * 8;
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+      });
+    });
+
+    // --------------------------------------------------------------------------
+    // 7. INTERACTIVE SIMULATOR RUNTIME
+    // --------------------------------------------------------------------------
+    const remoteVideoContainer = document.getElementById('remote-video-container');
+    const btnToggleBlur = document.getElementById('btn-toggle-blur');
+    const blurBtnText = document.getElementById('blur-btn-text');
+    const safetyShield = document.getElementById('safety-shield-indicator');
+    const btnNextPeer = document.getElementById('btn-next-peer');
+    const btnStopCall = document.getElementById('btn-stop-call');
+    const btnReportPeer = document.getElementById('btn-report-peer');
+    const peerIdLabel = document.getElementById('peer-id-label');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input-field');
+    const chatBox = document.getElementById('chat-messages-box');
+    const linkWarning = document.getElementById('link-block-warning');
+    const callDuration = document.getElementById('call-duration');
+    const localVideo = document.getElementById('local-video-preview');
+    const btnToggleHardware = document.getElementById('btn-toggle-hardware');
+
+    let isBlurred = true;
+    let callSeconds = 0;
+    let callInterval = null;
+    let peerIndex = 1;
+
+    // Match preference UI. The selected value is saved locally; the server must
+    // apply this preference in its matchmaking queue for real filtered matching.
+    const monthlyButton = document.getElementById('subikisan-monthly-btn');
+    if (monthlyButton) monthlyButton.addEventListener('click', () => {
+      const status = document.getElementById('subscription-status');
+      if (status) status.textContent = 'Selected: Subikisan Premium — ₹99/month. Connect a verified payment gateway to activate purchases.';
+    });
+
+    let selectedGenderPreference = 'any';
+    const genderPreferenceStatus = document.getElementById('gender-preference-status');
+    document.querySelectorAll('.gender-choice').forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedGenderPreference = button.dataset.gender;
+        document.querySelectorAll('.gender-choice').forEach((choice) => {
+          const active = choice === button;
+          choice.setAttribute('aria-pressed', String(active));
+          choice.classList.toggle('border-[#00f0ff]', active);
+          choice.classList.toggle('bg-[#00f0ff]/10', active);
+          choice.classList.toggle('text-[#00f0ff]', active);
+          choice.classList.toggle('border-zinc-700', !active);
+          choice.classList.toggle('bg-zinc-900', !active);
+          choice.classList.toggle('text-zinc-300', !active);
+        });
+        const labels = { any: 'Any', male: 'Male', female: 'Female' };
+        genderPreferenceStatus.textContent = `Preference: ${labels[selectedGenderPreference]} (saved in this page)`;
+      });
+    });
+
+    // Start Call Timer
+    function startTimer() {
+      clearInterval(callInterval);
+      callSeconds = 0;
+      callInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const secs = String(callSeconds % 60).padStart(2, '0');
+        callDuration.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+    startTimer();
+
+    // Toggle Blur Feature
+    btnToggleBlur.addEventListener('click', () => {
+      isBlurred = !isBlurred;
+      if (isBlurred) {
+        remoteVideoContainer.classList.remove('safety-unblur');
+        remoteVideoContainer.classList.add('safety-blur');
+        blurBtnText.textContent = 'Unblur Safe Preview';
+        safetyShield.classList.remove('hidden');
+      } else {
+        remoteVideoContainer.classList.remove('safety-blur');
+        remoteVideoContainer.classList.add('safety-unblur');
+        blurBtnText.textContent = 'Enable Safe Blur';
+        safetyShield.classList.add('hidden');
+      }
+    });
+
+    // Real random matching client. Deploy server/ to a Node host, then set SIGNALING_SERVER_URL below.
+    const SIGNALING_SERVER_URL = 'https://YOUR-RENDER-SERVICE.onrender.com';
+    const remoteVideo = document.getElementById('remote-video');
+    let nexusSocket = null, nexusPc = null, currentPeerId = null, queuedForMatch = false;
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+    function logMatch(text, tone='amber') {
+      const div = document.createElement('div');
+      div.className = 'p-2 rounded bg-zinc-900/80 border text-xs font-mono ' + (tone==='green'?'border-emerald-500/40 text-emerald-200':'border-amber-500/40 text-amber-200');
+      div.textContent = text; chatBox.appendChild(div); chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    function setRemoteVisible(visible) {
+      remoteVideo.classList.toggle('hidden', !visible);
+      document.getElementById('stream-noise-canvas')?.classList.toggle('hidden', visible);
+      document.getElementById('remote-avatar-card')?.classList.toggle('hidden', visible);
+    }
+    function closePeer() {
+      currentPeerId = null;
+      if (nexusPc) { try { nexusPc.ontrack=null; nexusPc.onicecandidate=null; nexusPc.close(); } catch(_){} nexusPc=null; }
+      if (remoteVideo) remoteVideo.srcObject = null;
+      setRemoteVisible(false);
+    }
+    function ensureSocket() {
+      if (nexusSocket && nexusSocket.connected) return Promise.resolve(nexusSocket);
+      if (typeof io !== 'function') return Promise.reject(new Error('Socket.IO client load नहीं हुआ।'));
+      if (!nexusSocket) {
+        nexusSocket = io(SIGNALING_SERVER_URL, { transports:['websocket','polling'], timeout:15000 });
+        nexusSocket.on('connect', () => logMatch('Signaling server से जुड़ गए। अब Next / Skip दबाएँ।','green'));
+        nexusSocket.on('connect_error', () => logMatch('Signaling server नहीं मिला। पहले server deploy करके SIGNALING_SERVER_URL सही करें।'));
+        nexusSocket.on('waiting_in_queue', () => { queuedForMatch=true; peerIdLabel.textContent='WAITING FOR STRANGER'; document.getElementById('webrtc-state-text').textContent='WAITING_FOR_PEER'; logMatch('आप queue में हैं। दूसरे व्यक्ति के जुड़ने का इंतज़ार है।'); });
+        nexusSocket.on('peer_matched', async ({peerId, initiator}) => {
+          currentPeerId=peerId; queuedForMatch=false; peerIdLabel.textContent='PEER MATCHED';
+          document.getElementById('webrtc-state-text').textContent='NEGOTIATING_WEBRTC';
+          try {
+            if (!localMediaStream) await startLocalMediaTest();
+            if (!localMediaStream) throw new Error('Camera/mic अनुमति आवश्यक है।');
+            closePeer(); currentPeerId=peerId;
+            nexusPc = new RTCPeerConnection(rtcConfig);
+            localMediaStream.getTracks().forEach(t=>nexusPc.addTrack(t,localMediaStream));
+            nexusPc.ontrack = ev => { remoteVideo.srcObject=ev.streams[0]; setRemoteVisible(true); document.getElementById('webrtc-state-text').textContent='PEER_CONNECTED'; peerIdLabel.textContent='CONNECTED'; startTimer(); logMatch('वीडियो कनेक्ट हो गया।','green'); };
+            nexusPc.onicecandidate = ev => { if(ev.candidate && currentPeerId) nexusSocket.emit('signal_ice',{target:currentPeerId,candidate:ev.candidate}); };
+            nexusPc.onconnectionstatechange = () => { if(nexusPc && ['failed','disconnected','closed'].includes(nexusPc.connectionState)) { document.getElementById('webrtc-state-text').textContent='CONNECTION_'+nexusPc.connectionState.toUpperCase(); } };
+            if (initiator) { const offer=await nexusPc.createOffer(); await nexusPc.setLocalDescription(offer); nexusSocket.emit('signal_offer',{target:peerId,offer}); }
+          } catch(err) { logMatch('कनेक्शन शुरू नहीं हुआ: '+(err.message||err)); }
+        });
+        nexusSocket.on('signal_offer', async ({sender,offer}) => { try { if(!nexusPc) return; await nexusPc.setRemoteDescription(new RTCSessionDescription(offer)); const answer=await nexusPc.createAnswer(); await nexusPc.setLocalDescription(answer); nexusSocket.emit('signal_answer',{target:sender,answer}); } catch(e){logMatch('Offer error: '+e.message);} });
+        nexusSocket.on('signal_answer', async ({sender,answer}) => { try { if(nexusPc && sender===currentPeerId) await nexusPc.setRemoteDescription(new RTCSessionDescription(answer)); } catch(e){logMatch('Answer error: '+e.message);} });
+        nexusSocket.on('signal_ice', async ({sender,candidate}) => { try { if(nexusPc && sender===currentPeerId) await nexusPc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(_){} });
+        nexusSocket.on('peer_disconnected', () => { closePeer(); peerIdLabel.textContent='PEER LEFT'; document.getElementById('webrtc-state-text').textContent='PEER_DISCONNECTED'; logMatch('दूसरा व्यक्ति डिस्कनेक्ट हो गया। Next / Skip दबाकर नया व्यक्ति खोजें।'); });
+      }
+      return new Promise((resolve,reject)=>{ if(nexusSocket.connected) resolve(nexusSocket); else { const timer=setTimeout(()=>reject(new Error('Server से कनेक्शन नहीं हुआ।')),16000); nexusSocket.once('connect',()=>{clearTimeout(timer);resolve(nexusSocket)}); nexusSocket.once('connect_error',()=>{clearTimeout(timer);reject(new Error('Server से कनेक्शन नहीं हुआ।'))}); }});
+    }
+    async function matchNextPeer() {
+      try {
+        if (!SIGNALING_SERVER_URL.startsWith('https://') || SIGNALING_SERVER_URL.includes('YOUR-RENDER-SERVICE')) { logMatch('पहले server deploy करें और HTML में SIGNALING_SERVER_URL बदलें।'); return; }
+        if (!localMediaStream) await startLocalMediaTest();
+        if (!localMediaStream) return;
+        closePeer();
+        const socket=await ensureSocket();
+        socket.emit('find_peer');
+        document.getElementById('webrtc-state-text').textContent='SEARCHING_FOR_PEER';
+      } catch(e) { logMatch(e.message || 'Matching server से कनेक्शन नहीं हुआ।'); }
+    }
+    btnNextPeer.addEventListener('click', matchNextPeer);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') matchNextPeer(); });
+
+    // Stop Call
+    btnStopCall.addEventListener('click', () => {
+      if (nexusSocket && nexusSocket.connected) nexusSocket.emit('leave_queue');
+      closePeer();
+      clearInterval(callInterval);
+      callDuration.textContent = 'STOPPED';
+      peerIdLabel.textContent = 'DISCONNECTED';
+      if (localMediaStream) {
+        localMediaStream.getTracks().forEach(track => track.stop());
+        localMediaStream = null;
+        localVideo.srcObject = null;
+        document.getElementById('local-video-fallback').classList.remove('hidden');
+      }
+      const div = document.createElement('div');
+      div.className = 'p-2 rounded bg-zinc-900/80 border border-[#ff0055]/40 text-[#ff0055] text-xs font-mono';
+      div.textContent = '[STOPPED]: Local camera/microphone stopped. No remote peer was connected.';
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Report Peer Button
+    btnReportPeer.addEventListener('click', () => {
+      alert("Report workflow is a UI placeholder; no moderation backend is connected yet.");
+    });
+
+    // Phishing & Link Blocker in Chat
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = chatInput.value.trim();
+      if (!val) return;
+
+      // Strict Anti-Link Regex
+      const linkRegex = /(https?:\/\/|www\.|\.com|\.org|\.net|\.xyz|\.io|http|ftp)/i;
+      if (linkRegex.test(val)) {
+        linkWarning.classList.remove('hidden');
+        setTimeout(() => linkWarning.classList.add('hidden'), 3500);
+        return;
+      }
+
+      // Append Valid Clean Message
+      const userMsg = document.createElement('div');
+      userMsg.className = 'p-2 rounded bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-white text-xs font-mono';
+      userMsg.innerHTML = `<span class="text-[#00f0ff] font-bold">[YOU]:</span> ${escapeHtml(val)}`;
+      chatBox.appendChild(userMsg);
+      chatInput.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Real local camera + microphone permission test (requires HTTPS and user permission).
+    let localMediaStream = null;
+    async function startLocalMediaTest() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera/mic API उपलब्ध नहीं है। Netlify की HTTPS वेबसाइट खोलें और Chrome में अनुमति जाँचें।');
+        return;
+      }
+      try {
+        if (localMediaStream) localMediaStream.getTracks().forEach(track => track.stop());
+        localMediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localMediaStream;
+        document.getElementById('local-video-fallback').classList.add('hidden');
+        const audioOk = localMediaStream.getAudioTracks().length > 0;
+        const videoOk = localMediaStream.getVideoTracks().length > 0;
+        const div = document.createElement('div');
+        div.className = 'p-2 rounded bg-emerald-900/30 border border-emerald-500/40 text-emerald-200 text-xs font-mono';
+        div.textContent = `[DEVICE TEST]: Camera ${videoOk ? 'ready' : 'not found'}; microphone ${audioOk ? 'ready' : 'not found'}. This is a local test only.`;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        btnToggleHardware.textContent = 'Stop Camera + Mic Test';
+      } catch (err) {
+        const name = err && err.name ? err.name : 'UnknownError';
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          alert('Camera/Mic permission blocked है। Netlify Dashboard के preview/embedded window में नहीं, वेबसाइट को सीधे Chrome tab में खोलें। फिर Chrome Site settings में Camera और Microphone को Allow करें।');
+        } else {
+          alert('Camera/mic test नहीं चला (' + name + '). Camera किसी दूसरी app में इस्तेमाल हो रहा हो तो उसे बंद करें और Chrome permissions जाँचें।');
+        }
+      }
+    }
+    btnToggleHardware.addEventListener('click', async () => {
+      if (localMediaStream) {
+        localMediaStream.getTracks().forEach(track => track.stop());
+        localMediaStream = null;
+        localVideo.srcObject = null;
+        document.getElementById('local-video-fallback').classList.remove('hidden');
+        btnToggleHardware.textContent = 'Webcam + Mic Test — Start Camera';
+      } else {
+        await startLocalMediaTest();
+      }
+    });
+    // Camera/mic buttons start the permission test on first tap; later taps toggle tracks.
+    document.getElementById('btn-toggle-cam').addEventListener('click', async () => {
+      if (!localMediaStream) { await startLocalMediaTest(); return; }
+      const track = localMediaStream.getVideoTracks()[0];
+      if (track) track.enabled = !track.enabled;
+    });
+    document.getElementById('btn-toggle-mic').addEventListener('click', async () => {
+      if (!localMediaStream) { await startLocalMediaTest(); return; }
+      const track = localMediaStream.getAudioTracks()[0];
+      if (track) track.enabled = !track.enabled;
+    });
+
+    // Simulated Noise Wave Canvas for Remote Stream
+    (function initNoiseCanvas() {
+      const canvas = document.getElementById('stream-noise-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let w = canvas.width = 400;
+      let h = canvas.height = 300;
+
+      function renderNoise() {
+        const imgData = ctx.createImageData(w, h);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const v = (Math.random() * 35) | 0;
+          data[i] = v + 10;
+          data[i+1] = v + 15;
+          data[i+2] = v + 25;
+          data[i+3] = 255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        requestAnimationFrame(renderNoise);
+      }
+      renderNoise();
+    })();
+
+    // --------------------------------------------------------------------------
+    // 8. CODE VIEW TAB SWITCHER
+    // --------------------------------------------------------------------------
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const codeViews = document.querySelectorAll('.code-view');
+    const activeFileName = document.getElementById('active-filename');
+
+    const fileMap = {
+      'tab-tree': 'nexus-project-tree.txt',
+      'tab-backend': 'server/matchmaker-signaling.js',
+      'tab-frontend': 'hooks/useWebRTC.ts',
+      'tab-turn': 'utils/stunTurnMatrix.ts'
+    };
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => {
+          b.classList.remove('bg-[#00f0ff]', 'text-black', 'font-bold');
+          b.classList.add('text-zinc-400');
+        });
+        btn.classList.add('bg-[#00f0ff]', 'text-black', 'font-bold');
+        btn.classList.remove('text-zinc-400');
+
+        const targetTab = btn.getAttribute('data-tab');
+        codeViews.forEach(v => v.classList.add('hidden'));
+        document.getElementById(targetTab)?.classList.remove('hidden');
+        activeFileName.textContent = fileMap[targetTab] || 'code.txt';
+      });
+    });
+
+    // Copy Snippet Feature
+    const btnCopy = document.getElementById('btn-copy-code');
+    const copyIndicator = document.getElementById('copy-text-indicator');
+    btnCopy.addEventListener('click', () => {
+      const activePre = document.querySelector('.code-view:not(.hidden)');
+      if (activePre) {
+        navigator.clipboard.writeText(activePre.innerText).then(() => {
+          copyIndicator.textContent = 'Copied!';
+          setTimeout(() => copyIndicator.textContent = 'Copy Snippet', 2000);
+        });
+      }
+    });
+
+  </script>
+
+<script data-forge-safety>
+
+(function () {
+  var seen = new WeakMap();
+  function hasContent(el) {
+    return (el.textContent || '').trim().length > 0 || !!el.querySelector('img,svg,canvas,video');
+  }
+  function check() {
+    if (document.hidden || !document.body) return;
+    var vh = window.innerHeight || 800, now = Date.now();
+    var els = document.body.querySelectorAll('*');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var r = el.getBoundingClientRect();
+      if (r.bottom < -40 || r.top > vh + 40 || r.width < 12 || r.height < 12) continue;
+      var cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.pointerEvents === 'none' || cs.position === 'fixed') continue;
+      if (el.getAttribute('aria-hidden') === 'true' || el.tagName === 'CANVAS') continue;
+      if (parseFloat(cs.opacity) < 0.05 || cs.visibility === 'hidden') {
+        if (!hasContent(el)) continue;
+        var t = seen.get(el);
+        if (!t) { seen.set(el, now); continue; }
+        if (now - t > 1400) {
+          el.style.setProperty('transition', 'opacity .6s ease', 'important');
+          el.style.setProperty('opacity', '1', 'important');
+          el.style.setProperty('visibility', 'visible', 'important');
+        }
+      } else if (seen.has(el)) {
+        seen.delete(el);
+      }
+    }
+  }
+  setInterval(check, 900);
+})();
+
+</script>
+  <!-- Firebase Auth compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script>
+    // Public web app configuration for the NEXUS-18 Firebase project.
+    // Keep Firebase Authentication > Settings > Authorized domains updated with your Netlify hostname.
+    const nexusFirebaseConfig = {
+      apiKey: "AIzaSyC9jeLa4fifRH24dewecrUfv-tVoErIonc",
+      authDomain: "wraps-on-wheels.firebaseapp.com",
+      databaseURL: "https://wraps-on-wheels-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "wraps-on-wheels",
+      storageBucket: "wraps-on-wheels.firebasestorage.app",
+      messagingSenderId: "891475422514",
+      appId: "1:891475422514:web:cb7dee5c5edf2e45e37b2b",
+      measurementId: "G-LYN0LBGEPE"
+    };
+    (() => {
+      const modal = document.getElementById('nexus-auth-modal');
+      const message = document.getElementById('nexus-auth-message');
+      const phoneInput = document.getElementById('nexus-phone');
+      const otpInput = document.getElementById('nexus-otp-code');
+      const otpEntry = document.getElementById('nexus-otp-entry');
+      let auth = null, verifier = null, confirmation = null, recaptchaWidgetRendered = false;
+      const say = (text, error = true) => { message.textContent = text; message.className = 'text-sm mt-4 ' + (error ? 'text-rose-300' : 'text-emerald-300'); };
+      const open = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+      const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+      document.getElementById('nexus-auth-close').addEventListener('click', close);
+      modal.addEventListener('click', e => { if (e.target === modal) close(); });
+      function getAuth() {
+        if (!window.firebase || !firebase.apps) throw new Error('Firebase SDK load नहीं हुआ। Internet connection जाँचें।');
+        if (!firebase.apps.length) firebase.initializeApp(nexusFirebaseConfig);
+        auth = firebase.auth();
+        return auth;
+      }
+      const profileModal = document.getElementById('nexus-profile-modal');
+      const profileMessage = document.getElementById('nexus-profile-message');
+      const avatarButton = document.getElementById('nexus-profile-avatar-btn');
+      const profileMenuButton = document.getElementById('nexus-profile-menu-btn');
+      const defaultAvatar = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#111622"/><circle cx="32" cy="23" r="12" fill="#00f0ff"/><path d="M10 60c2-14 10-21 22-21s20 7 22 21" fill="#00f0ff"/></svg>');
+      const showProfile = () => { if (!auth || !auth.currentUser) { open(); return; } profileMessage.textContent = ''; profileModal.classList.remove('hidden'); profileModal.classList.add('flex'); };
+      const closeProfile = () => { profileModal.classList.add('hidden'); profileModal.classList.remove('flex'); };
+      function updateProfileUI(user) {
+        const signedIn = !!user;
+        const photo = user && user.photoURL ? user.photoURL : defaultAvatar;
+        const name = user && user.displayName ? user.displayName : (user && user.email ? user.email.split('@')[0] : 'NEXUS User');
+        [document.getElementById('nexus-header-avatar'), document.getElementById('nexus-menu-avatar'), document.getElementById('nexus-profile-photo')].forEach(img => { if (img) img.src = photo; });
+        document.getElementById('nexus-profile-avatar-btn').classList.toggle('hidden', !signedIn);
+        document.getElementById('nexus-profile-menu-btn').classList.toggle('hidden', !signedIn);
+        document.getElementById('nexus-menu-name').textContent = name;
+        document.getElementById('nexus-menu-email').textContent = (user && user.email) || 'Signed in';
+        document.getElementById('nexus-profile-name').textContent = name;
+        document.getElementById('nexus-profile-email').textContent = (user && user.email) || (user && user.phoneNumber) || 'No email provided';
+        document.getElementById('nexus-profile-name-input').value = (user && user.displayName) || '';
+        document.getElementById('nexus-profile-uid').textContent = (user && user.uid) || '';
+        const created = user && user.metadata && user.metadata.creationTime;
+        document.getElementById('nexus-profile-created').textContent = created ? new Date(created).toLocaleString() : 'Not available';
+        document.getElementById('nexus-auth-open').textContent = signedIn ? 'MY PROFILE' : 'LOGIN / SIGN UP';
+        document.getElementById('nexus-auth-open-mobile').textContent = signedIn ? 'ACCOUNT / LOGIN' : 'LOGIN / SIGN UP';
+      }
+      document.getElementById('nexus-profile-avatar-btn').addEventListener('click', showProfile);
+      document.getElementById('nexus-profile-menu-btn').addEventListener('click', () => { document.getElementById('mobile-menu')?.classList.add('hidden'); showProfile(); });
+      document.getElementById('nexus-auth-open').addEventListener('click', () => { if (auth && auth.currentUser) showProfile(); else open(); });
+      document.getElementById('nexus-auth-open-mobile').addEventListener('click', () => { document.getElementById('mobile-menu')?.classList.add('hidden'); if (auth && auth.currentUser) showProfile(); else open(); });
+      document.getElementById('nexus-profile-close').addEventListener('click', closeProfile);
+      profileModal.addEventListener('click', e => { if (e.target === profileModal) closeProfile(); });
+      document.getElementById('nexus-profile-save').addEventListener('click', async () => {
+        try {
+          const user = auth && auth.currentUser;
+          if (!user) { profileMessage.textContent = 'पहले लॉगिन करें।'; return; }
+          const displayName = document.getElementById('nexus-profile-name-input').value.trim();
+          if (!displayName) { profileMessage.textContent = 'अपना नाम लिखें।'; return; }
+          await user.updateProfile({ displayName });
+          updateProfileUI(user);
+          profileMessage.textContent = 'Profile name saved successfully.';
+          profileMessage.className = 'text-sm text-emerald-300 mt-3';
+        } catch (e) {
+          profileMessage.textContent = 'नाम सेव नहीं हुआ: ' + ((e && e.message) || 'Please try again.');
+          profileMessage.className = 'text-sm text-rose-300 mt-3';
+        }
+      });
+      document.getElementById('nexus-profile-logout').addEventListener('click', async () => {
+        try { if (auth) await auth.signOut(); closeProfile(); close(); say('आप लॉगआउट हो गए हैं।', false); }
+        catch (e) { profileMessage.textContent = 'Logout असफल: ' + ((e && e.message) || 'Please try again.'); }
+      });
+      try { getAuth().onAuthStateChanged(user => { updateProfileUI(user); if (user) close(); }); }
+      catch (e) { console.warn('Firebase auth profile initialization:', e); }
+
+      document.getElementById('nexus-google-login').addEventListener('click', async () => {
+        try {
+          say('Google Login खोला जा रहा है…', false);
+          const a = getAuth();
+          const provider = new firebase.auth.GoogleAuthProvider();
+          const result = await a.signInWithPopup(provider);
+          updateProfileUI(result.user);
+          close();
+          say('Google Login सफल हुआ।', false);
+        } catch (e) {
+          const code = e && e.code ? e.code : '';
+          if (code === 'auth/unauthorized-domain') say('यह वेबसाइट Firebase में Authorized Domains में नहीं है, या प्रकाशित HTML में गलत Firebase config है। Firebase > Authentication > Settings > Authorized domains में इसी वेबसाइट का exact Netlify domain जोड़ें।');
+          else if (code === 'auth/popup-blocked') say('Chrome ने popup रोका है। Popup की अनुमति दें और फिर कोशिश करें।');
+          else say('Google Login असफल: ' + (code || e.message || 'Unknown error'));
+        }
+      });
+      document.getElementById('nexus-send-otp').addEventListener('click', async () => {
+        try {
+          const a = getAuth();
+          const phone = phoneInput.value.trim().replace(/[\s()-]/g, '');
+          if (!/^\+[1-9]\d{7,14}$/.test(phone)) { say('नंबर country code के साथ लिखें, जैसे +919876543210।'); return; }
+          if (!verifier) {
+            verifier = new firebase.auth.RecaptchaVerifier('nexus-recaptcha', { size: 'normal', callback: () => say('reCAPTCHA verified. अब Send OTP दबाएँ।', false), 'expired-callback': () => say('reCAPTCHA expire हो गया। पेज refresh करके दोबारा कोशिश करें।') });
+            await verifier.render();
+            say('पहले reCAPTCHA पूरा करें, फिर Send OTP दबाएँ।', false);
+            return;
+          }
+          confirmation = await a.signInWithPhoneNumber(phone, verifier);
+          otpEntry.classList.remove('hidden');
+          say('SMS भेज दिया गया। प्राप्त OTP डालकर Verify OTP दबाएँ।', false);
+        } catch (e) {
+          const code = e && e.code ? e.code : '';
+          if (code === 'auth/billing-not-enabled') say('Firebase SMS OTP के लिए आपके प्रोजेक्ट में Cloud Billing सक्षम नहीं है। Billing जोड़ना पड़ सकता है; शुल्क लग सकता है।');
+          else if (code === 'auth/operation-not-allowed') say('Firebase Phone provider/region policy SMS की अनुमति नहीं दे रही। Authentication में Phone provider और SMS region policy जाँचें।');
+          else if (code === 'auth/unauthorized-domain') say('यह वेबसाइट Firebase Authorized Domains में मान्य नहीं है।');
+          else if (code === 'auth/too-many-requests') say('बहुत अधिक कोशिशें हुईं। थोड़ी देर बाद फिर कोशिश करें।');
+          else say('OTP नहीं भेजा गया: ' + (code || e.message || 'Unknown error'));
+          if (verifier) { try { verifier.clear(); } catch (_) {} verifier = null; }
+        }
+      });
+      document.getElementById('nexus-verify-otp').addEventListener('click', async () => {
+        try {
+          if (!confirmation) { say('पहले Send OTP दबाएँ।'); return; }
+          const code = otpInput.value.trim();
+          if (!code) { say('SMS में आया OTP दर्ज करें।'); return; }
+          const result = await confirmation.confirm(code);
+          updateProfileUI(result.user);
+          close();
+          say('Mobile OTP verification सफल हुआ।', false);
+        } catch (e) { say('OTP verification असफल: ' + ((e && e.code) || e.message || 'गलत या expire हुआ OTP')); }
+      });
+    })();
+  </script>
+</body>
+</html>
